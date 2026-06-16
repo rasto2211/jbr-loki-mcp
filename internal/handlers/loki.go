@@ -57,8 +57,18 @@ const EnvLokiPassword = "LOKI_PASSWORD"
 // Environment variable name for Loki Token
 const EnvLokiToken = "LOKI_TOKEN"
 
+// Environment variable name for Grafana User header
+const EnvLokiGrafanaUser = "LOKI_GRAFANA_USER"
+
 // Default Loki URL when environment variable is not set
 const DefaultLokiURL = "http://localhost:3100"
+
+func describeEnvDefault(prefix, value, envVar string) string {
+	if value == "" {
+		return fmt.Sprintf("%s (from %s env var)", prefix, envVar)
+	}
+	return fmt.Sprintf("%s (default set via %s env var)", prefix, envVar)
+}
 
 // LokiLabelsResult represents the structure of Loki label names response
 type LokiLabelsResult struct {
@@ -101,13 +111,13 @@ func NewLokiQueryTool() mcp.Tool {
 			mcp.DefaultString(lokiURL),
 		),
 		mcp.WithString("username",
-			mcp.Description(fmt.Sprintf("Username for basic authentication (default: %s from %s env var)", username, EnvLokiUsername)),
+			mcp.Description(describeEnvDefault("Username for basic authentication", username, EnvLokiUsername)),
 		),
 		mcp.WithString("password",
-			mcp.Description(fmt.Sprintf("Password for basic authentication (default: %s from %s env var)", password, EnvLokiPassword)),
+			mcp.Description(describeEnvDefault("Password for basic authentication", password, EnvLokiPassword)),
 		),
 		mcp.WithString("token",
-			mcp.Description(fmt.Sprintf("Bearer token for authentication (default: %s from %s env var)", token, EnvLokiToken)),
+			mcp.Description(describeEnvDefault("Bearer token for authentication", token, EnvLokiToken)),
 		),
 		mcp.WithString("start",
 			mcp.Description("Start time for the query (default: 1h ago)"),
@@ -172,6 +182,7 @@ func HandleLokiQuery(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		// Fallback to environment variable
 		orgID = os.Getenv(EnvLokiOrgID)
 	}
+	grafanaUser := os.Getenv(EnvLokiGrafanaUser)
 
 	// Set defaults for optional parameters
 	start := time.Now().Add(-1 * time.Hour).Unix()
@@ -212,7 +223,7 @@ func HandleLokiQuery(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	}
 
 	// Execute query with authentication
-	result, err := executeLokiQuery(ctx, queryURL, username, password, token, orgID)
+	result, err := executeLokiQuery(ctx, queryURL, username, password, token, orgID, grafanaUser)
 	if err != nil {
 		return nil, fmt.Errorf("query execution failed: %v", err)
 	}
@@ -309,7 +320,7 @@ func buildLokiQueryURL(baseURL, query string, start, end int64, limit int) (stri
 }
 
 // executeLokiQuery sends the HTTP request to Loki
-func executeLokiQuery(ctx context.Context, queryURL string, username, password, token, orgID string) (*LokiResult, error) {
+func executeLokiQuery(ctx context.Context, queryURL string, username, password, token, orgID, grafanaUser string) (*LokiResult, error) {
 	// Create HTTP request
 	req, err := http.NewRequestWithContext(ctx, "GET", queryURL, nil)
 	if err != nil {
@@ -328,6 +339,10 @@ func executeLokiQuery(ctx context.Context, queryURL string, username, password, 
 	// Add orgid if provided
 	if orgID != "" {
 		req.Header.Add("X-Scope-OrgID", orgID)
+	}
+
+	if grafanaUser != "" {
+		req.Header.Add("X-Grafana-User", grafanaUser)
 	}
 
 	// Execute request
@@ -485,13 +500,13 @@ func NewLokiLabelNamesTool() mcp.Tool {
 			mcp.DefaultString(lokiURL),
 		),
 		mcp.WithString("username",
-			mcp.Description(fmt.Sprintf("Username for basic authentication (default: %s from %s env var)", username, EnvLokiUsername)),
+			mcp.Description(describeEnvDefault("Username for basic authentication", username, EnvLokiUsername)),
 		),
 		mcp.WithString("password",
-			mcp.Description(fmt.Sprintf("Password for basic authentication (default: %s from %s env var)", password, EnvLokiPassword)),
+			mcp.Description(describeEnvDefault("Password for basic authentication", password, EnvLokiPassword)),
 		),
 		mcp.WithString("token",
-			mcp.Description(fmt.Sprintf("Bearer token for authentication (default: %s from %s env var)", token, EnvLokiToken)),
+			mcp.Description(describeEnvDefault("Bearer token for authentication", token, EnvLokiToken)),
 		),
 		mcp.WithString("start",
 			mcp.Description("Start time for the query (default: 1h ago)"),
@@ -534,13 +549,13 @@ func NewLokiLabelValuesTool() mcp.Tool {
 			mcp.DefaultString(lokiURL),
 		),
 		mcp.WithString("username",
-			mcp.Description(fmt.Sprintf("Username for basic authentication (default: %s from %s env var)", username, EnvLokiUsername)),
+			mcp.Description(describeEnvDefault("Username for basic authentication", username, EnvLokiUsername)),
 		),
 		mcp.WithString("password",
-			mcp.Description(fmt.Sprintf("Password for basic authentication (default: %s from %s env var)", password, EnvLokiPassword)),
+			mcp.Description(describeEnvDefault("Password for basic authentication", password, EnvLokiPassword)),
 		),
 		mcp.WithString("token",
-			mcp.Description(fmt.Sprintf("Bearer token for authentication (default: %s from %s env var)", token, EnvLokiToken)),
+			mcp.Description(describeEnvDefault("Bearer token for authentication", token, EnvLokiToken)),
 		),
 		mcp.WithString("start",
 			mcp.Description("Start time for the query (default: 1h ago)"),
@@ -597,6 +612,7 @@ func HandleLokiLabelNames(ctx context.Context, request mcp.CallToolRequest) (*mc
 	} else {
 		orgID = os.Getenv(EnvLokiOrgID)
 	}
+	grafanaUser := os.Getenv(EnvLokiGrafanaUser)
 
 	// Set defaults for optional parameters
 	start := time.Now().Add(-1 * time.Hour).Unix()
@@ -632,7 +648,7 @@ func HandleLokiLabelNames(ctx context.Context, request mcp.CallToolRequest) (*mc
 	}
 
 	// Execute labels request
-	result, err := executeLokiLabelsQuery(ctx, labelsURL, username, password, token, orgID)
+	result, err := executeLokiLabelsQuery(ctx, labelsURL, username, password, token, orgID, grafanaUser)
 	if err != nil {
 		return nil, fmt.Errorf("labels query execution failed: %v", err)
 	}
@@ -686,6 +702,7 @@ func HandleLokiLabelValues(ctx context.Context, request mcp.CallToolRequest) (*m
 	} else {
 		orgID = os.Getenv(EnvLokiOrgID)
 	}
+	grafanaUser := os.Getenv(EnvLokiGrafanaUser)
 
 	// Set defaults for optional parameters
 	start := time.Now().Add(-1 * time.Hour).Unix()
@@ -721,7 +738,7 @@ func HandleLokiLabelValues(ctx context.Context, request mcp.CallToolRequest) (*m
 	}
 
 	// Execute label values request
-	result, err := executeLokiLabelValuesQuery(ctx, labelValuesURL, username, password, token, orgID)
+	result, err := executeLokiLabelValuesQuery(ctx, labelValuesURL, username, password, token, orgID, grafanaUser)
 	if err != nil {
 		return nil, fmt.Errorf("label values query execution failed: %v", err)
 	}
@@ -796,7 +813,7 @@ func buildLokiLabelValuesURL(baseURL, labelName string, start, end int64) (strin
 }
 
 // executeLokiLabelsQuery sends the HTTP request to Loki labels endpoint
-func executeLokiLabelsQuery(ctx context.Context, queryURL string, username, password, token, orgID string) (*LokiLabelsResult, error) {
+func executeLokiLabelsQuery(ctx context.Context, queryURL string, username, password, token, orgID, grafanaUser string) (*LokiLabelsResult, error) {
 	// Create HTTP request
 	req, err := http.NewRequestWithContext(ctx, "GET", queryURL, nil)
 	if err != nil {
@@ -813,6 +830,10 @@ func executeLokiLabelsQuery(ctx context.Context, queryURL string, username, pass
 	// Add orgid if provided
 	if orgID != "" {
 		req.Header.Add("X-Scope-OrgID", orgID)
+	}
+
+	if grafanaUser != "" {
+		req.Header.Add("X-Grafana-User", grafanaUser)
 	}
 
 	// Execute request
@@ -851,7 +872,7 @@ func executeLokiLabelsQuery(ctx context.Context, queryURL string, username, pass
 }
 
 // executeLokiLabelValuesQuery sends the HTTP request to Loki label values endpoint
-func executeLokiLabelValuesQuery(ctx context.Context, queryURL string, username, password, token, orgID string) (*LokiLabelValuesResult, error) {
+func executeLokiLabelValuesQuery(ctx context.Context, queryURL string, username, password, token, orgID, grafanaUser string) (*LokiLabelValuesResult, error) {
 	// Create HTTP request
 	req, err := http.NewRequestWithContext(ctx, "GET", queryURL, nil)
 	if err != nil {
@@ -868,6 +889,10 @@ func executeLokiLabelValuesQuery(ctx context.Context, queryURL string, username,
 	// Add orgid if provided
 	if orgID != "" {
 		req.Header.Add("X-Scope-OrgID", orgID)
+	}
+
+	if grafanaUser != "" {
+		req.Header.Add("X-Grafana-User", grafanaUser)
 	}
 
 	// Execute request
