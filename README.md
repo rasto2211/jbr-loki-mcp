@@ -355,6 +355,30 @@ The key is to naturally mention any specific parameters in your request - the AI
 
 This makes it very convenient to set up default connection parameters once and then use natural language queries without having to specify authentication details every time.
 
+## Using with Claude Code (Remote)
+
+If the server is deployed remotely (e.g. on Kubernetes with an Ingress), configure Claude Code to connect via streamable HTTP:
+
+```json
+{
+  "mcpServers": {
+    "loki": {
+      "type": "streamable-http",
+      "url": "https://loki-mcp-server.dev-dws-jbr-europe-west4-gke.intellij.net/stream",
+      "headers": {
+        "Authorization": "Basic <base64-encoded user:password>"
+      }
+    }
+  }
+}
+```
+
+To generate the base64-encoded credentials:
+
+```bash
+echo -n 'user:password' | base64
+```
+
 ## Using with Cursor
 
 You can also integrate the Loki MCP server with the Cursor editor. To do this, add the following configuration to your Cursor settings:
