@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki-mcp-server
+  namespace: logging
+  labels:
+    app: loki-mcp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki-mcp-server
+  template:
+    metadata:
+      labels:
+        app: loki-mcp-server
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: loki-mcp-server
+          image: europe-west4-docker.pkg.dev/gke-dev-dws-jbr/ar/loki-mcp-server:latest
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: LOKI_URL
+              value: "https://loki.labs.jb.gg"
+            - name: LOKI_USERNAME
+              value: "dwsjbr"
+            - name: LOKI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: loki
+                  key: password
+            - name: PORT
+              value: "8080"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki-mcp-server
+  namespace: logging
+  labels:
+    app: loki-mcp-server
+spec:
+  selector:
+    app: loki-mcp-server
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
